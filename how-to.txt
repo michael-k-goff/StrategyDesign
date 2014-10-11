@@ -1,0 +1,41 @@
+This document contains code snippets and instructions for basic tasks.
+
+SPARQL and RDFstuff:
+
+Clear the RDF database:
+    store.execute("CONSTRUCT {?s ?p ?o} WHERE { ?s ?p ?o }", function(success, results){ // A simple command to clear out the database
+	  store.delete(results, function(success) {});
+	});
+Can also modify the query to clear out portions of the database
+
+Alternate method for clearing the RDF database:
+    store.execute("DELETE {?s ?p ?o} WHERE {?s ?p ?o}", function(success, results) {} );
+	
+Example of a selective deletion query:
+	store.execute("DELETE {?s ?p ?o} WHERE {?s ?p ?o; <http://xmlns.com/foaf/0.1/name> \"alice\"}", function(success,results) {
+
+************************************************************************************************************************
+Other stuff:
+	
+Reload code without restarting the app.  It is necessary to clear the cache, since otherwise a change in the file on disk will 
+        not propagate to the program.
+Example:
+  delete require.cache[__dirname+"\\templates.js"];
+  var templates_js = require("./templates.js");
+  templates_js.Update(exports.Templates, exports.Assets);
+  
+Creating a new template:
+  var pong_template = new Templates( {name:"Pong", code: h.SimpleInputForm(["name"]), fn: PongFunction} );
+- The MakeTemplate function in templates.js will make a new template if there is none by the given name, or replace it if there is.
+- Usage of MakeTemplate: MakeTemplate("RPG",h.SimpleInputForm(["name"]),RPG);.  The three parameters are the name, the code invoked 
+    when the template is selected from the main page, and the code invoked when the input form is submitted.
+
+Deleting a template:
+  Call the DeleteTemplate(name) function from within Update() in templates.js
+  
+Using h.SaveAndLoadGame: this is a "standard" function to call upon submission of an input form.  It creates a new game instance
+		and starts the game for user.  The parameters are (request, response, dbManager, game_data)
+. The first three parameters are standard objects.
+. The fourth parameter is the data needed to create the game and is itself a composite object.  A typical example:
+   var gameCode = h.MakeScript(varCode + keyCode + mouseCode + displayCode);
+   var game_data = {name: request.body.name, gameCode: gameCode, http_func: http_func, x: 640, y: 480};

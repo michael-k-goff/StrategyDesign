@@ -1,0 +1,21 @@
+A list of tasks.
+
+- Create a functional RPG template
+    . Module system
+        . Have default inclusion/exclusion of modules be determined by the template rather than the modules themselves
+        . Have modules govern generation of the data graph
+        . Let the template decide which modules to be considered
+        . Mechanism for automatic inclusion of modules for which prerequisites are satisfied
+        . Mechanism for automatically including prerequisites of a specified module
+        . Figure out how to deal with soft dependencies
+	. More and varied enemies
+	. Passable graphics
+	. Cut scenes
+	. Massive clean-up and organization
+	. Graphical enhancement
+- Frame skipping for rapid autoplay
+- Server-side autoplay
+- Use server-side autoplay to adjust weights via genetic programming
+- For subsequent templates, use three.js
+- Redo the Bag of Objects model for hierarchical objects
+- 4X template

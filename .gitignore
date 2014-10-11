@@ -1,0 +1,8 @@
+/node_modules
+/docs
+/i18n
+/db
+/notes
+/test
+MongoDB-manual.pdf
+angular*

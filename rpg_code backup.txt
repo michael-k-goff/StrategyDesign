@@ -1,0 +1,784 @@
+// A standard keyboard manager.  Keeps track of which keys are pressed.
+// Values: 13, Enter; 16, Backspace; 32, Spacebar
+var keyRepeatTimes = {13:15, 38:8, 40:8, 16: 15, 32:15};
+function KeyManager() {this.keys = [];this.Countdown = 0;}
+KeyManager.prototype.KeyDown = function(key) {if (this.keys.indexOf(key) < 0) {this.keys.push(key); this.Countdown = 0;}}
+KeyManager.prototype.HardQuery = function(key) {
+  if (this.keys.indexOf(key) < 0) {return false;}
+  if (keyRepeatTimes[key]) {this.Countdown = keyRepeatTimes[key];}
+  return true;
+}
+KeyManager.prototype.Query = function(key) {
+  if (this.keys.indexOf(key) < 0) {return false;}
+  if (this.Countdown > 0) {return false;}
+  if (keyRepeatTimes[key]) {this.Countdown = keyRepeatTimes[key];}
+  return true;
+}
+KeyManager.prototype.DelayQuery = function(key) { // Query but don't reset the countdown until after done processing
+  if (this.keys.indexOf(key) < 0) {return false;}
+  if (this.Countdown > 0) {return false;}
+  if (keyRepeatTimes[key]) {this.ToSetCountdown = keyRepeatTimes[key];}
+  return true;
+}
+KeyManager.prototype.Reset = function() {
+  if (this.ToSetCountdown && !this.Countdown) {
+    this.Countdown = this.ToSetCountdown;
+  }
+  this.ToSetCountdown = 0;
+}
+KeyManager.prototype.KeyUp = function(key) {for (var i=this.keys.length; i--;) {if (this.keys[i] == key) {this.keys.splice(i,1);}}}
+var KeyMan = new KeyManager();
+function OnKeyDown(e) {
+  var keyCode = e.keyCode;
+  KeyMan.KeyDown(keyCode);
+}
+window.onkeydown=function(e) {OnKeyDown(e);};
+function OnKeyUp(e) {
+  var keyCode = e.keyCode;
+  KeyMan.KeyUp(keyCode);
+}
+window.onkeyup=function(e) {OnKeyUp(e);};
+
+// A general menu class
+function Menu(input) {this.Choice = input.Choice; this.NumChoices = input.NumChoices; this.ChoiceDisplay = input.ChoiceDisplay;
+  this.cursor = 0, this.cursorParams = input.cursorParams;
+}
+Menu.prototype.Display = function() {
+  var num_choices = this.NumChoices();
+  for (var i = 0; i < num_choices; i++) {this.ChoiceDisplay(i);}
+  DrawColorRect({x:this.cursorParams.x+(this.cursorParams.dx)*this.cursor, y:this.cursorParams.y+(this.cursorParams.dy)*this.cursor, w: 13, h: 13, r:1,g:1,b:1})
+}
+Menu.prototype.Choice = function() {return this.Choice(this.cursor);}
+Menu.prototype.Process = function() {
+  if (KeyMan.Query(40) && this.cursor < this.NumChoices() - 1) {this.cursor++;}
+  if (KeyMan.Query(38) && this.cursor > 0) {this.cursor--;}
+}
+Menu.prototype.Reset = function() {this.cursor = 0;}
+// Create a menu on a list of objects
+function MenuByList(inputs) {
+  ChoiceDisplay = inputs.ChoiceDisplay; cursorParams = inputs.cursorParams
+  // Default choice display with location extracted from cursor parameters.  Assumes the input menu is a list of strings
+  if (!ChoiceDisplay) {ChoiceDisplay = function(i) {ctx.fillText(this.choices[i],this.cursorParams.x+30+this.cursorParams.dx*i,this.cursorParams.y+13+this.cursorParams.dy*i);}}
+  ret_value = new Menu({Choice: function() {return this.choices[this.cursor]}, 
+                NumChoices: function() {return this.choices.length}, ChoiceDisplay: ChoiceDisplay, cursorParams: cursorParams});
+  ret_value.choices = inputs.choices;
+  ret_value.ChoiceNum = function() {return this.cursor};
+  return ret_value;
+}
+
+// Classes to manage a general state system
+// Substates are objects that should have all methods invokved by the top state.
+function State(input) {
+  this.state = "";	// The current substate.  An empty string indicates a top level state
+  // Dump all input variables into the state.  May contain substate specifications, TopDisplay and TopProcess function, Activate function, etc.
+  for (var key in input) {this[key] = input[key]}
+  this.Display = function() {
+    if (this.TopDisplay) {this.TopDisplay();}
+	if (this.state && this.substates[this.state].Display) {this.substates[this.state].Display();}
+  }
+  this.Process = function() {
+    var return_value = {}; // What gets returned
+    var result = {}; // The result from processing of any substate
+    if (this.TopProcess) {return_value = this.TopProcess();}
+	if (this.state && this.substates[this.state].Process) {
+	  result = this.substates[this.state].Process();
+	  if (!result) {var result = {};}
+	  if (result && result.ChangeState) {
+	    new_state = result.ChangeState;
+		if (result.ChangeState == "X") {new_state = "";}
+		this.ChangeState(new_state);
+	  }
+	}
+	if (this.PostProcess) {return this.PostProcess(return_value,result);}
+	return return_value;
+  }
+  this.ChangeState = function(new_state) {
+    this.state = new_state;
+	if (this.state && this.substates[this.state].Activate) {this.substates[this.state].Activate();}
+  }
+}
+
+// Top level data
+var GameData = {}; SetGameData();
+var gameImages = {}; gameTextures = {};
+var GameState = {}; // All variables stored here.
+
+// Create menus.  Will probably dissolve this block into the state system
+var MainMenu = MenuByList({choices: ["Items","Save","Status"], cursorParams: {x:10, y:17, dx:0, dy:30}});
+var BattleMenu = MenuByList({choices: ["Attack","Run"], cursorParams: {x: 70, y:387, dx:0, dy:30}});
+var TownMenu = MenuByList({choices: ["Inn 3G","Buy Items","Buy Equipment"], cursorParams: {x:10, y:17, dx:0, dy:30}});
+var BuyitemMenu = MenuByList({choices: GameData.BuyitemList, cursorParams: {x:10, y:17, dx:0, dy:30},ChoiceDisplay: function(i) {
+  ctx.fillText(this.choices[i][0],40,30+30*i);
+  ctx.fillText(this.choices[i][1]+ " G",180,30+30*i);
+}});
+ItemMenu = MenuByList({choices: [], cursorParams: {x:10, y:17, dx:0, dy:30},ChoiceDisplay: function(i) {
+  ctx.fillText(this.choices[i][0],40,30+30*i);
+  ctx.fillText("X " + this.choices[i][1],180,30+30*i);
+}}); // Fill in choices later
+var BuyequipMenu = MenuByList({choices: GameData.EquipList, cursorParams: {x:10, y:17, dx:0, dy:30},ChoiceDisplay: function(i) {
+  ctx.fillText(this.choices[i][0],40,30+30*i);
+  ctx.fillText(this.choices[i][2]+ " G",180,30+30*i);
+}});
+
+// Here we begin with the construction of the state system
+
+// Status state: display the status.  Currently no lower level states
+function DisplayStatus() {
+  ctx.fillText(GameState["Equipment"]["W"][0],40,30);
+  ctx.fillText(GameState["Equipment"]["W"][3],180,30);
+  ctx.fillText(GameState["Equipment"]["A"][0],40,60);
+  ctx.fillText(GameState["Equipment"]["A"][3],180,60);
+}
+function ProcessStatus() {
+  if (KeyMan.Query(16)) {return {ChangeState:"X"};}
+}
+var StatusState = {Display: DisplayStatus, Process: ProcessStatus};
+// Use an item state
+function ProcessItemMenu()
+{
+  if (KeyMan.Query(16)) {return {ChangeState:"X"};}
+  ItemMenu.Process();
+  if (KeyMan.Query(13)) { // Use an item
+    var depleted = UseItem(ItemMenu.ChoiceNum());
+	if (depleted) {return {ChangeState:"X"};}
+  }
+}
+var ItemMenuState = {Display:function() {ItemMenu.Display();}, Process: ProcessItemMenu, 
+    Activate: function() {ItemMenu.Reset()}};
+// Main menu state
+function DisplayMainMenu()
+{
+  ctx.fillStyle='#000000';
+  DrawColorRect({x:0,y:0,w:240,h:480});
+  DrawColorRect({x:380,y:0,w:260,h:200});
+  ctx.font = '20px Arial';
+  ctx.fillStyle='#FFFFFF';
+  DisplayStatsUpperRight();
+  if (this.state == "") {MainMenu.Display();}  
+  for (var i=0; i<GameState.MenuReport.length; i++) { // Display report
+    ctx.fillText(GameState.MenuReport[i],20,390+30*i);
+  }
+}
+function ProcessMainMenu()
+{
+  if (KeyMan.DelayQuery(16) || KeyMan.DelayQuery(13)) {GameState.MenuReport = [];}
+  if (this.state) {return;} // Only to this stuff in the top main menu
+  if (KeyMan.Query(16)) {return {ChangeState: "X"};} // Shift key gets out of the menu
+  MainMenu.Process();
+  if (KeyMan.Query(13)) {
+    if (MainMenu.Choice() == "Items") { // Items
+	  if (GameState.Items.length == 0) {GameState.MenuReport = ["No items"];}
+	  else {
+	    this.ChangeState("ItemMenu");
+	  }
+	}
+	else if (MainMenu.Choice() == "Save") { // Save
+	  xmlhttp = new XMLHttpRequest();
+	  xmlhttp.open('POST','/comm',true);
+	  xmlhttp.setRequestHeader('Content-type', 'application/json; charset=utf-8');
+	  var reqString = JSON.stringify({'gameID':gameID, 'operation':'save',stats:GameState});
+	  xmlhttp.send(reqString);
+	  GameState.MenuReport = ["Saving..."];
+	}
+	else if (MainMenu.Choice() == "Status") { // Status
+	  this.ChangeState("Status");
+	}
+	else {
+	  GameState.MenuReport = ["???"];
+	}
+  }
+}
+function MainMenuActivate() {MainMenu.Reset(); this.state = ""; GameState.MenuReport = [];}
+var MainMenuState = new State({substates:{Status:StatusState,ItemMenu:ItemMenuState},
+    TopDisplay: DisplayMainMenu, TopProcess: ProcessMainMenu, Activate: MainMenuActivate});
+// State to process battle victory
+function ProcessVictory() {
+  if (KeyMan.Query(16) || KeyMan.Query(13)) {return {BattleOutcome:"Victory"};}
+}
+var VictoryState = {Process: ProcessVictory};
+// State to process battle defeat
+function ProcessLoss() {
+  if (KeyMan.Query(16) || KeyMan.Query(13)) {return {BattleOutcome:"Loss"};}
+}
+var LossState = {Process: ProcessLoss};
+// State to process battles
+function BattleProcess() { // Move the battle along as necessary
+  BattleMenu.Process();
+  if (!this.state && KeyMan.Query(13)) { // Enter key
+    if (BattleMenu.Choice() == "Run") {return {ChangeState: "X"};} // Run away
+	else if (BattleMenu.Choice() == "Attack") {
+	  myDamage = GameState.Stats.Str + GameState.Equipment.W[3];
+	  GameState.BattleReport = ["Attacked for " + myDamage + " damage."];
+	  GameState.Enemy.HP -= myDamage;
+	  if (GameState.Enemy.HP <= 0) { // Victory
+	    this.ChangeState("Victory");
+		GameState.BattleReport.push("You are victorious!");
+		GameState.BattleReport.push("Received "+GameState.Enemy.EXP+" EXP");
+		GameState.BattleReport.push("Received "+GameState.Enemy.Gold+" Gold");
+		GameState.Stats.EXP += GameState.Enemy.EXP;
+		GameState.Stats.Gold += GameState.Enemy.Gold;
+		if (GameState.Stats.EXP >= 3*GameState.Stats.Level*(GameState.Stats.Level+1)/2) { // Gain a level
+		  GameState.Stats.Level++;
+		  GameState.BattleReport.push("Gained a level!");
+		  GameState.Stats.MaxHP += (GameState.Stats.Level + Math.floor(Math.random()*GameState.Stats.Level));
+		  GameState.Stats.Str++;
+		}
+	  }
+	  else {
+	    var enemyDamage = GameState.Enemy.Str - GameState.Equipment.A[3];
+		if (enemyDamage < 0) {enemyDamage = 0;}
+	    GameState.BattleReport.push("The " + GameState.Enemy.name + " attacked for " + enemyDamage + " damage.");
+		GameState.Stats.HP -= enemyDamage;
+		if (GameState.Stats.HP <= 0) { // Loss
+		  this.ChangeState("Loss");
+		  GameState.BattleReport.push("You have died.");
+		}
+	  }
+	}
+  }
+}
+function BattlePostProcess(return_value,result) {
+  if (!return_value) {return_value = {};}
+  if (result.BattleOutcome == "Victory") {return_value.ChangeState = "X";}
+  if (result.BattleOutcome == "Loss") {InitStats(); return_value.ChangeState = "X";}
+  return return_value;
+}
+function BattleDisplay() {
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  if (this.state != "Victory") {DrawImage32({x:304,y:224,image:GameState.Enemy.id});}
+  ctx.fillStyle='#FFFFFF';
+  ctx.font='20px Arial';
+  DisplayStatsUpperRight();
+  if (!this.state) {BattleMenu.Display();}
+  for (var i = 0; i < GameState.BattleReport.length; i++) {
+    ctx.fillText(GameState.BattleReport[i],20,30+30*i);
+  }
+}
+function BattleActivate() {this.state = ""; GameState.BattleReport = [];}
+var BattleState = new State({substates:{Victory:VictoryState, Loss:LossState}, TopProcess: BattleProcess, TopDisplay: BattleDisplay,
+    Activate: BattleActivate, PostProcess: BattlePostProcess});
+// Buy Item state
+function ProcessBuyitem() {
+  if (KeyMan.Query(16)) {return {ChangeState: "X"};}
+  BuyitemMenu.Process();
+  if (KeyMan.Query(13)) {
+    var item = GameData.BuyitemList[BuyitemMenu.ChoiceNum()];
+	if (GameState.Stats.Gold < item[1]) {
+	  GameState.MenuReport = ["Not enough money."];
+	}
+	else {
+	  GameState.Stats.Gold -= item[1];
+	  GrantItem(item[0]);
+	  GameState.MenuReport = ["Thanks!"];
+	}
+  }
+}
+var BuyitemState = {Display: function() {BuyitemMenu.Display();}, Process: ProcessBuyitem, Activate: function() {BuyitemMenu.Reset();}};
+// Buy Equipment state
+function ProcessBuyequip() {
+  if (KeyMan.Query(16)) {GameState.MenuReport = []; return {ChangeState: "X"};}
+  BuyequipMenu.Process();
+  if (KeyMan.Query(13)) {
+    var item = GameData.EquipList[BuyequipMenu.ChoiceNum()];
+	if (item[2] > GameState.Stats.Gold) {GameState.MenuReport = ["Not enough gold."];}
+	else {
+	  GameState.Stats.Gold -= item[2];
+	  GameState.MenuReport = ["Thanks!"];
+	  GameState.Equipment[item[1]] = item;
+	}
+  }
+}
+var BuyequipState = {Display: function() {BuyequipMenu.Display();}, Process: ProcessBuyequip, Activate: function() {BuyequipMenu.Reset();}};
+// Town state
+function TownProcess() {
+  if (this.state) {return;}
+  if (KeyMan.Query(16)) {return {ChangeState: "X"};} // Shift key gets out of the menu
+  TownMenu.Process();
+  if (KeyMan.Query(13)) {
+    if (TownMenu.Choice() == "Inn 3G") { // Inn
+	  if (GameState.Stats.Gold >= 3) {
+	    GameState.Stats.Gold -= 3;
+		GameState.Stats.HP = GameState.Stats.MaxHP;
+    	GameState.MenuReport = ["HP Restored."];
+		}
+	  else {GameState.MenuReport = ["Not enough gold."];}
+	}
+	else if (TownMenu.Choice() == "Buy Items") { // Buy items
+	  GameState.MenuReport = [];
+	  this.ChangeState("BuyItem");
+	}
+	else if (TownMenu.Choice() == "Buy Equipment") { // Buy equipment
+	  GameState.MenuReport = [];
+	  this.ChangeState("BuyEquip");
+	}
+	else {
+	  GameState.MenuReport = ["???"];
+	}
+  } 
+}
+function TownDisplay() {
+  ctx.fillStyle='#000000';
+  DrawColorRect({x:0,y:0,w:240,h:480});
+  DrawColorRect({x:380,y:0,w:260,h:200});
+  ctx.font = '20px Arial';
+  ctx.fillStyle='#FFFFFF';
+  DisplayStatsUpperRight();
+  for (var i=0; i<GameState.MenuReport.length; i++) {
+    ctx.fillText(GameState.MenuReport[i],20,390+30*i);
+  }
+  if (!this.state) {TownMenu.Display();}
+}
+function TownActivate() {TownMenu.Reset();GameState.MenuReport = [];}
+var TownState = new State({substates:{BuyItem: BuyitemState, BuyEquip: BuyequipState}, TopProcess: TownProcess, TopDisplay: TownDisplay,
+    Activate: TownActivate});
+// Conversation state: This is the state when talking with a person or otherwise receiving textual information
+function ConvDisplay() {
+  DrawColorRect({x:0,y:300,w:640,h:180});
+  ctx.font = '20px Arial';
+  ctx.fillStyle='#FFFFFF';
+  var cur_text = GameState.CurConv.text[GameState.CurConv.screen_num];
+  for (var i = 0; i < cur_text.length; i++) {ctx.fillText(cur_text[i],20,340+30*i);}
+}
+function ConvProcess() {
+  if (KeyMan.Query(13) || KeyMan.Query(32)) {
+    if (GameState.CurConv.screen_num < GameState.CurConv.text.length-1) {GameState.CurConv.screen_num += 1;}
+	else {return {ChangeState: "X"};}
+  }
+  if (KeyMan.Query(16)) {return {ChangeState: "X"};}
+}
+var ConvState = {Display: ConvDisplay, Process: ConvProcess};
+// Core state: This state controls all others.  The top state is the map display
+function CoreProcess() { // Move from one panel to the next on the map, depending on what key(s) are down.
+  // Determine target location
+  GameState.FrameNum += 1;
+  if (this.state) {return;}
+  if (KeyMan.Query(13)) {
+    this.ChangeState("MainMenu");
+	return;
+  }
+  if (KeyMan.Query(32)) {QueryMap();return;}
+  var tx = GameState.location.x;
+  var ty = GameState.location.y;
+  if (KeyMan.HardQuery(37)) {tx--;GameState.location.dx = -1; GameState.location.dy = 0;}
+  if (KeyMan.HardQuery(38)) {ty--;GameState.location.dx = 0; GameState.location.dy = -1;}
+  if (KeyMan.HardQuery(39)) {tx++;GameState.location.dx = 1; GameState.location.dy = 0;}
+  if (KeyMan.HardQuery(40)) {ty++;GameState.location.dx = 0; GameState.location.dy = 1;}
+  // Manage the step counter
+  if (tx == GameState.location.x && ty == GameState.location.y) {
+    GameState.location.stepwait = 0;
+	return;
+  }
+  if (GameState.location.stepwait > 0) {
+    GameState.location.stepwait--;
+	return;
+  }
+  // Determine if the target location is valid
+  var cur_map = GameData.maps[GameState.location.map]
+  var cur_tileset = GameData.tilesets[cur_map.tileset];
+  if (ty < 0 || ty >= cur_map.tiles.length || tx < 0 || tx >= cur_map.tiles[ty].length) {return} // Prevent walking off the map
+  if (!cur_tileset[cur_map.tiles[ty][tx]][1]) {return} // Block walking on impassible tiles
+  for (var obj in cur_map.objects) { // Check impassible map objects
+    if (cur_map.objects[obj].x == tx && cur_map.objects[obj].y == ty && cur_map.objects[obj].Impassible && cur_map.objects[obj].Impassible()) {return;}
+  }
+  // Make the step
+  GameState.location.x = tx;
+  GameState.location.y = ty;
+  GameState.location.stepwait = 3;
+  // Process events
+  for (var obj in cur_map.objects) {
+    if (cur_map.objects[obj].x == GameState.location.x && cur_map.objects[obj].y == GameState.location.y && cur_map.objects[obj].Enter) {
+	  cur_map.objects[obj].Enter();
+	  return; // Only one map object assumed per panel, and they are safe from battles.
+	}
+  }
+  SetBattle(); // Check if a battle should occur and enter if it necessary
+}
+function CoreDisplay() {ctx.clearRect(0,0,640,480);if (this.state != "Battle") {DrawMap();}}
+function CoreActivate() {}
+var CoreState = new State({substates:{Town: TownState, MainMenu: MainMenuState, Battle: BattleState, Conv: ConvState},
+    TopProcess: CoreProcess, TopDisplay: CoreDisplay,Activate: CoreActivate});
+
+// Here we define classes for the map objects
+// For now, assume that every map object takes up one panel, given by coordinates x,y, and the map is implicit.
+function Town(input) {this.x = input.x; this.y = input.y;} // Town
+Town.prototype.Display = function() {DrawImage32({x:304+32*(-GameState.location.x+this.x),y:224+32*(-GameState.location.y+this.y),image:"town.jpg"})}
+Town.prototype.Enter = function() {CoreState.ChangeState("Town");}
+// Warp from one map point to another
+function Warp(input) {this.x = input.x; this.y = input.y; this.destmap = input.destmap; this.destx = input.destx; this.desty = input.desty}
+Warp.prototype.Display = function() {DrawImage32({x:304+32*(-GameState.location.x+this.x),y:224+32*(-GameState.location.y+this.y),image:"warp.jpg"})}
+Warp.prototype.Enter = function() {GameState.location.map = this.destmap; GameState.location.x = this.destx; GameState.location.y = this.desty;}
+// A person
+function Person(input) {this.x = input.x; this.y = input.y; this.text = input.text}
+Person.prototype.Display = function() {DrawImage32({x:304+32*(-GameState.location.x+this.x),y:224+32*(-GameState.location.y+this.y),image:"person.jpg"})}
+Person.prototype.Query = function() {CoreState.ChangeState("Conv"); GameState.CurConv = {text: this.text, screen_num:0};}
+Person.prototype.Impassible = function() {return true;}
+
+function SetGameData() { // Sets not only maps but all other game data
+  var overmap = ["ffffffffffffffffffffffffffffffffffffffff",
+                 "ffffffffffffffffffffffffffffffffffffffff",
+				 "ffffffwffffffffffffffffffffffffffffwwfff",
+				 "fffffwwwwfffffffffffffffffffffffffffffff",
+				 "ffffffwwwfffffffffffffffffffffffffffffff",
+				 "ffffffwwffffffffffffffffffffffffffffffff",
+				 "ffffffffffffffffffffffffffffffffffffffff",
+				 "ffffffffffffffffffffffffffffffffffffffff",
+				 "fffffffffffffffffffffwwwwfffffffffffffff",
+				 "fffffffffffffffffffffffwwwffffffffffffff",
+				 "fffffffffffffffffffffwwwwfffffffffffffff",
+				 "ffffffffffffffffffffffwwffffffffffffffff",
+				 "fffffffffwffffffffffffwfffffffffffffffff",
+				 "ffffffffffffffffffffffwfffffffffffffffff",
+				 "ffffffffffffffffffffffwwffffffffffffffff",
+				 "fffffffffffffffffffffffwffffffffffffffff",
+				 "ffffffffffffffffffffffwwffffffffffffffff",
+				 "ffffffffffffffffffffffffffffffffffffffff",
+				 "ffffffffffffffffffffffffffffffffffffffff",
+				 "ffffffwwffffffffffffffffffffffffffffffff",
+				 "ffffffwwffffffffffffffffffffffffffffffff",
+				 "fffffffwwfffffffffffffffffffffffffffffff",
+				 "ffffffffffffffffffffffffffffffffffffwfff",
+				 "ffffffffffffffffffffffffffffffffffffffff",];
+  var town1 = new Town({x:2,y:0});
+  var warp1 = new Warp({x:0,y:5,destmap:"Overworld2",destx:0,desty:0});
+  var person1 = new Person({x:4,y:0,text:[["Hi","I\'m a person"],["I say stuff."]]});
+  var warp2 = new Warp({x:0,y:0,destmap:"Overworld",destx:0,desty:5});
+  GameData.maps = {Overworld:{tiles:overmap,tileset:"Overtile",objects:[town1,warp1,person1],
+       encounter: [0.1,["alien","bunny"]]}};
+  overmap = ["fffffff",
+             "fffffff",
+			 "ffwffff",
+			 "ffffwff",
+			 "fffffff",
+			 "fffffff"];
+  GameData.maps.Overworld2 = {tiles:overmap,tileset:"Overtile",objects:[warp2],
+       encounter: [0.1,["blob","spider"]]};
+  var overtile = {f:["tree.jpg",1], w:["water.jpg",0], border: "w"};
+  GameData.tilesets = {Overtile: overtile};
+  GameData.BuyitemList = [["Potion",1],["Hi-Potion",3]];
+  // Equipment formatted as Name, Type, Cost, Strength
+  GameData.EquipList = [["None","W",0,0],["Club","W",5,1],["None","A",0,0],["Clothes","A",5,1]];
+  // Enemy list
+  GameData.Enemies = {};
+  GameData.Enemies.alien = {name: "Alien", id: "alien.jpg", HP:3, Str:1, EXP:1, Gold:2};
+  GameData.Enemies.spider = {name: "Spider", id: "spider.jpg", HP:4, Str:2, EXP:2, Gold:2};
+  GameData.Enemies.blob = {name: "Blob", id: "blob.jpg", HP:5, Str:2, EXP:3, Gold:4};
+  GameData.Enemies.bunny = {name: "Bunny", id: "bunny.jpg", HP:2, Str:1, EXP:1, Gold:1};
+}
+
+function DrawHero() {
+  if (GameState.location.dy == 1) {DrawImage32({x:304, y: 224, image: "herodown.jpg"});}
+  else if (GameState.location.dy == -1) {DrawImage32({x:304, y: 224, image: "heroup.jpg"});}
+  else if (GameState.location.dx == 1) {DrawImage32({x:304, y: 224, image: "heroright.jpg"});}
+  else {DrawImage32({x:304, y: 224, image: "heroleft.jpg"});}
+}
+
+function DrawMap() {
+  gl.useProgram(shaderProgram);
+  var cur_map = GameData.maps[GameState.location.map]
+  var cur_tileset = GameData.tilesets[cur_map.tileset];
+  var border_tile = cur_tileset[cur_tileset.border][0];
+  mat4.identity(mvMatrix);
+  mvPushMatrix();
+  gl.bindBuffer(gl.ARRAY_BUFFER, rectBuffer);
+  for (var i = -11; i < 12; i++) { // Draw panels
+    var x = i+GameState.location.x;
+    for (var j = -9; j < 10; j++) {
+	  var y = j + GameState.location.y;
+	  if (y < 0 || y >= cur_map.tiles.length || x < 0 || x >= cur_map.tiles[y].length) { // Draw tiles off the map
+    	DrawImage32({x:304+32*i, y:224+32*j, image:border_tile});
+	  }
+	  else {
+	    var tile = cur_tileset[cur_map.tiles[y][x]][0];
+		DrawImage32({x:304+32*i, y:224+32*j, image:tile});
+	  }
+	}
+  }
+  for (var obj in cur_map.objects) {if (cur_map.objects[obj].Display) {cur_map.objects[obj].Display();}}
+  DrawHero();
+  mvPopMatrix();
+}
+
+function QueryMap() {
+  var cur_map = GameData.maps[GameState.location.map];
+  var tx = GameState.location.x + GameState.location.dx;
+  var ty = GameState.location.y + GameState.location.dy;
+  for (var obj in cur_map.objects) {
+    if (cur_map.objects[obj].x == tx && cur_map.objects[obj].y == ty && cur_map.objects[obj].Query) {cur_map.objects[obj].Query();};
+  }
+}
+
+function SetBattle() {
+  var cur_map = GameData.maps[GameState.location.map];
+  if (!cur_map.encounter) {return;}
+  if (Math.random() >= cur_map.encounter[0]) {return;}
+  BattleMenu.Reset();
+  CoreState.ChangeState("Battle");
+  BattleState.Activate();
+  var rand_enemy = (Math.round((Math.random()*30000)))%(cur_map.encounter[1].length);
+  var cur_enemy = GameData.Enemies[cur_map.encounter[1][rand_enemy]];
+  for (key in cur_enemy) {GameState.Enemy[key] = cur_enemy[key]}
+  GameState.BattleReport = ["A " + GameState.Enemy.name + " draws near.", "Command?"];
+}
+
+function DisplayStatsUpperRight() {
+  ctx.fillText("HP: " + GameState.Stats.HP + "/" + GameState.Stats.MaxHP,400,32);
+  ctx.fillText("Str: " + GameState.Stats.Str,400,62);
+  ctx.fillText("EXP: " + GameState.Stats.EXP,400,92);
+  ctx.fillText("Gold: " + GameState.Stats.Gold,400,122);
+  ctx.fillText("Level: " + GameState.Stats.Level,400,152);
+}
+
+function RestoreHP(num) {
+  GameState.Stats.HP += num;
+  if (GameState.Stats.HP > GameState.Stats.MaxHP) {GameState.Stats.HP = GameState.Stats.MaxHP}
+}
+
+function UseItem(num) { // Return 1 if the item is depleted.
+  if (GameState.Items[num][0] == "Potion") {
+    GameState.Items[num][1]--;
+	RestoreHP(5);
+  }
+  else if (GameState.Items[num][0] == "Hi-Potion") {
+    GameState.Items[num][1]--;
+	RestoreHP(10);
+  }
+  if (GameState.Items[num][1] <= 0) {
+    GameState.Items.splice(num,1);
+	return 1;
+  }
+}
+
+function GrantItem(name) {
+  for (var i = 0; i < GameState.Items.length; i++) {
+    if (GameState.Items[i][0] == name) {GameState.Items[i][1]++;return;}
+  }
+  GameState.Items.push([name,1]);
+}
+
+function InitStats() { // Initialize all player stats to their starting values.  Does not affect state data.
+  GameState.FrameNum = 0;
+  GameState.Enemy = {};
+  GameState.location = {map:"Overworld", x:0, y:0, stepwait:1, dx:0, dy:1}; // Location of the hero in the world.
+  GameState.Stats = {HP:10, MaxHP:10, Str:1, EXP:0, Gold:0, Level: 1};
+  GameState.Items = [["Potion", 3], ["Hi-Potion", 1]];
+  ItemMenu.choices = GameState.Items;
+  GameState.Equipment = {"W":["None","W",0,0],"A":["None","A",0,0]};
+}
+
+function IntervalMethod() {
+  KeyMan.Countdown--; // A single countdown for all menu processing
+  CoreState.Process();
+  CoreState.Display();
+  KeyMan.Reset();
+}
+
+function load_func() {
+  temp = JSON.parse(this.response);
+  for (var img in temp.images) {
+    var tempImage = new Image(); // Load into an image
+	tempImage.src = "data:image/jpeg;base64,"+temp.images[img];
+	gameImages[img] = tempImage;
+	gameTextures[img] = gl.createTexture(); // Load into a WebGL texture
+    gl.bindTexture(gl.TEXTURE_2D, gameTextures[img]);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, gameImages[img]);
+  }
+  setInterval(IntervalMethod,30);
+  InitStats();
+  // Load any saved game
+  xmlhttp = new XMLHttpRequest();
+  xmlhttp.open('POST','/comm',true);
+  xmlhttp.onload = function() {
+	if (this.response) {
+	  GameState.Stats = JSON.parse(this.response).Stats;
+	  GameState.Items = JSON.parse(this.response).Items;
+	  ItemMenu.choices = GameState.Items;
+	}
+  };
+  xmlhttp.setRequestHeader('Content-type', 'application/json; charset=utf-8');
+  var reqString = JSON.stringify({'gameID':gameID, 'operation':'load'});
+  xmlhttp.send(reqString);
+}
+// Initialize graphics
+function setMatrixUniforms() {
+  gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+  gl.uniformMatrix4fv(shaderProgram.Uniform, false, mvMatrix);
+}
+// Initialize graphics for color program
+function setMatrixUniformsColors() {
+  gl.uniformMatrix4fv(shaders.colorProgram.pMatrixUniform, false, pMatrix);
+  gl.uniformMatrix4fv(shaders.colorProgram.mvMatrixUniform, false, mvMatrix);
+}
+
+function getShader(gl, str, type) {
+    var shader;
+    if (type == "x-shader/x-fragment") {
+        shader = gl.createShader(gl.FRAGMENT_SHADER);
+    } else if (type == "x-shader/x-vertex") {
+        shader = gl.createShader(gl.VERTEX_SHADER);
+    } else {
+        return null;
+    }
+
+    gl.shaderSource(shader, str);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        alert(gl.getShaderInfoLog(shader));
+        return null;
+    }
+
+    return shader;
+}
+
+var shaderProgram;
+var colorLocation; var color2;
+var texCoordLocation;
+var rectBuffer;
+var shaders = {};
+function initShaders() {
+    // Create the shaders
+    var frag_str = "precision mediump float;uniform vec4 u_color;uniform sampler2D u_image;varying vec2 v_texCoord;" +
+	"void main(void) {gl_FragColor = texture2D(u_image, v_texCoord);}";
+	var color_str = "precision mediump float;uniform vec4 u_color;" +
+	"void main(void) {gl_FragColor = u_color;}";
+	var ver_str = "attribute vec2 aVertexPosition;uniform vec2 u_resolution;uniform mat4 uMVMatrix;" +
+	      "attribute vec2 a_texCoord;varying vec2 v_texCoord;" +
+	      "void main(void) {" +
+		  "vec4 res4 = vec4(u_resolution,1,1);" +
+	      "gl_Position = (uMVMatrix * vec4(aVertexPosition, 0.0,1.0))/res4 * vec4(2,-2,1,1) + vec4(-1,1,0,0);" +
+		  "v_texCoord = a_texCoord;}";
+    var fragmentShader = getShader(gl, frag_str, "x-shader/x-fragment");
+    var vertexShader = getShader(gl, ver_str, "x-shader/x-vertex");
+	var colorShader = getShader(gl, color_str, "x-shader/x-fragment");
+	var vertexShader2 = getShader(gl, ver_str, "x-shader/x-vertex");
+    // Create the programs
+    shaderProgram = gl.createProgram();
+    gl.attachShader(shaderProgram, vertexShader);
+    gl.attachShader(shaderProgram, fragmentShader);
+    gl.linkProgram(shaderProgram);
+	shaders.colorProgram = gl.createProgram();	// This program is for untextured drawing
+	gl.attachShader(shaders.colorProgram, vertexShader2);
+    gl.attachShader(shaders.colorProgram, colorShader);
+	gl.linkProgram(shaders.colorProgram);
+    // Sanity check
+    if (!gl.getProgramParameter(shaders.colorProgram, gl.LINK_STATUS)) {
+        alert("Could not initialise shaders");
+    }
+    // Set variables for shaderProgram
+	gl.useProgram(shaderProgram);
+    shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+    gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+    shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+    shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+	var resolutionLocation = gl.getUniformLocation(shaderProgram, "u_resolution");
+	var gl_canv = document.getElementById("glCanvas");
+    gl.uniform2f(resolutionLocation, gl_canv.width, gl_canv.height);
+	colorLocation = gl.getUniformLocation(shaderProgram, "u_color");
+	gl.uniform4f(colorLocation, 0,0,0, 1); // The default rendering color is black
+	// Create buffers
+	var texCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        0.0,  0.0,
+        1.0,  0.0,
+        0.0,  1.0,
+        1.0,  1.0]), gl.STATIC_DRAW);
+	rectBuffer = gl.createBuffer();
+	texCoordLocation = gl.getAttribLocation(shaderProgram, "a_texCoord");
+    gl.enableVertexAttribArray(texCoordLocation);
+    gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+	
+    gl.bindBuffer(gl.ARRAY_BUFFER, rectBuffer);
+    var vertices = [
+         0,0,  0.0,
+         32,0,  0.0,
+         0,32,  0.0,
+         32,32,  0.0
+    ];
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);	
+	// Set variables for the color shader, shaders.colorProgram
+	gl.useProgram(shaders.colorProgram);
+    shaders.colorProgram.vertexPositionAttribute = gl.getAttribLocation(shaders.colorProgram, "aVertexPosition");
+    gl.enableVertexAttribArray(shaders.colorProgram.vertexPositionAttribute);
+    shaders.colorProgram.pMatrixUniform = gl.getUniformLocation(shaders.colorProgram, "uPMatrix");
+    shaders.colorProgram.mvMatrixUniform = gl.getUniformLocation(shaders.colorProgram, "uMVMatrix");
+	var res2 = gl.getUniformLocation(shaders.colorProgram, "u_resolution");
+	var gl_canv = document.getElementById("glCanvas");
+    gl.uniform2f(res2, gl_canv.width, gl_canv.height);
+	color2 = gl.getUniformLocation(shaders.colorProgram, "u_color");
+	gl.uniform4f(color2, 0,0,0, 1); // The default rendering color is black
+	
+	gl.useProgram(shaderProgram);
+}
+
+var mvMatrix = mat4.create();
+var pMatrix = mat4.create();
+var mvMatrixStack = [];
+function mvPushMatrix() {
+  var copy = mat4.create();
+  mat4.set(mvMatrix, copy);
+  mvMatrixStack.push(copy);
+}
+function mvPopMatrix() {
+  if (mvMatrixStack.length == 0) {
+    throw "Invalid popMatrix!";
+  }
+  mvMatrix = mvMatrixStack.pop();
+}
+
+var gl;
+function initGL() {
+  try {
+    var gl_canv = document.getElementById("glCanvas");
+    gl = gl_canv.getContext("webgl") || canv.getContext("experimental-webgl");
+    gl.viewportWidth = gl_canv.width;
+    gl.viewportHeight = gl_canv.height;
+  } catch(e) {
+  }
+  if (!gl) {
+    console.log("Could not initialise WebGL, sorry :-( ");
+  }
+}
+initGL();
+initShaders();
+
+gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+function DrawColorRect(input) { // Draw a colored rectangle with arbitrary dimensions.  Assume 32X32 buffer
+    var r = input.r;
+	if (!r) {r=0;}
+	var g = input.g;
+	if (!g) {g=0;}
+	var b = input.b;
+	if (!b) {b=0;}
+    gl.useProgram(shaders.colorProgram);
+    mat4.identity(mvMatrix);
+	mat4.translate(mvMatrix, [input.x, input.y, 0.0]);
+	mat4.scale(mvMatrix,[input.w/32.0,input.h/32.0,1]);
+    gl.uniform4f(color2, r,g,b, 1);
+	gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+    setMatrixUniformsColors();
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+	gl.useProgram(shaderProgram);
+}
+
+function DrawImage32(input) { // Assume the 32 X 32 vertex buffer is bound
+    mat4.identity(mvMatrix);
+	mat4.translate(mvMatrix, [input.x, input.y, 0.0]);
+    gl.bindTexture(gl.TEXTURE_2D, gameTextures[input.image]);
+	gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+    setMatrixUniforms();
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+// Request RPG assets
+xmlhttp = new XMLHttpRequest();
+xmlhttp.open('POST','/comm',true);
+xmlhttp.onload = load_func;
+xmlhttp.setRequestHeader('Content-type', 'application/json; charset=utf-8');
+var reqString = JSON.stringify({'gameID':gameID, 'operation':'get_data'});
+xmlhttp.send(reqString);

@@ -1,0 +1,143 @@
+This file is a collection of assets and templates in the database.  Created November 5, 2013.
+It is currently only for reference and not used directly by the app.
+
+The following creates the Image Upload template:
+
+  var input_code = "form(action=\"temp\", method=\"post\", enctype=\"multipart/form-data\")\n" +
+    "  input(type=\"file\", name=\"newImage\")\n" +
+    "  input(type=\"hidden\", name=\"template\", value=\"#{locals.template_id}\")\n" +
+    "  br\n" +
+    "  input(type=\"submit\", name=\"Save\")";
+  function UploadFunction(request, response, dbManager, h) {
+    h.ReadFile(request.files.newImage.path, function(err,data) {
+      h.SaveFile("/images/" + request.files.newImage.name, data, function(err,data) {
+        response.send("Uploaded!");
+      });
+    });
+  }
+  var d = new Templates({name:"Image Upload", code: input_code, fn: UploadFunction});
+  d.save();
+  
+The following creates some classes and interaction classes:
+
+  // Background
+  var bgClass = {"init": "\"this.x=input.x;this.y=input.y;\"", 
+                 "Draw": "h.DrawRect(\"\'#BBFFBB\'\",\"0\",\"0\",\"this.x\",\"this.y\");"};
+  var bg = new Assets({name: "ClassBG", data: bgClass});
+  bg.save();
+  // Score
+  var scoreClass = {"init": "\"this.score=0;\"",
+                    "Draw": "h.DrawText(\"'#000000'\",\"'30px Arial'\", \"'Score: ' + this.score\",\"600\",\"60\")"  };
+  var score = new Assets({name: "ClassScore", data: scoreClass});
+  score.save();
+  // Border
+  var borderClass = {"init": "\"this.x=input.x;this.y=input.y;this.w=input.w;this.h=input.h;this.rx=input.rx;this.ry=input.ry;\"",
+                     "Draw": "h.DrawRect(\"'#FF0000'\",\"this.x\",\"this.y\",\"this.w\",\"this.h\")"  };
+  var border = new Assets({name: "ClassBorder", data: borderClass});
+  border.save();
+  // Paddle
+  var paddleClass = {"init": "\"this.p = input.p;this.hit=0;\"",
+                     "Draw": "h.DrawRect(\"'#FF0000'\",\"0\",\"this.p-50\",\"10\",\"100\")",
+                     "Update": "\"if (keyMan.Query(38)) {this.p -= 5;} if (keyMan.Query(40)) {this.p += 5;}\"" };
+  var paddle = new Assets({name: "ClassPaddle", data: paddleClass});
+  paddle.save();
+  // Ball
+  var ballClass = {"init": "\"this.x=input.x;this.y=input.y;this.vx=input.vx;this.vy=input.vy;\"",
+                   "Draw": "h.DrawRect(\"'#0000FF'\",\"this.x-5\",\"this.y-5\",\"10\",\"10\")",
+                   "Update": "\"this.x+=this.vx; this.y+=this.vy;\""};
+  var ball = new Assets({name: "ClassBall", data: ballClass});
+  ball.save();
+  // Ball-wall
+  var ballWallClass = {"init": "\"this.ball=input.varClassBall;this.wall=input.varClassBorder;\"",
+                   "Update": "\"if (this.ball.x > this.wall.x && this.ball.x < this.wall.x+this.wall.w && " +
+                             "this.ball.y > this.wall.y && this.ball.y < this.wall.y+this.wall.h)" +
+                             "{this.ball.vx *= this.wall.rx;this.ball.vy*=this.wall.ry;}\\n\""};
+  var ballWall = new Assets({name: "ClassBallWall", data: ballWallClass});
+  ballWall.save();
+  // Ball-paddle
+  var ballPaddleClass = {"init": "\"this.ball=input.varClassBall;this.paddle=input.varClassPaddle;\"",
+                         "Update": "\"if (this.ball.x < 10 && this.ball.vx < 0) {" +
+                             "this.paddle.hit=1;" +
+                             "if (this.ball.y>this.paddle.p+50 || this.ball.y<this.paddle.p-50) {this.paddle.hit = -1;}" +
+                             "this.ball.vx *= -1;}\""};
+  var ballPaddle = new Assets({name: "ClassBallPaddle", data: ballPaddleClass});
+  ballPaddle.save();
+  // Wall-paddle
+  var wallPaddleClass = {"init": "\"this.wall=input.varClassBorder;this.paddle=input.varClassPaddle;\"",
+                         "Update": "\"if (this.wall.x > 0) {return;}" + // Assume horizontal walls that reach the left side
+                            "if (this.paddle.p > this.wall.y && this.paddle.p < this.wall.y+50) {this.paddle.p = this.wall.y+50;}" +
+                            "if (this.paddle.p < this.wall.y && this.paddle.p > this.wall.y-40) {this.paddle.p = this.wall.y-40;}\"" };
+  var wallPaddle = new Assets({name: "ClassWallPaddle", data: wallPaddleClass});
+  wallPaddle.save();
+  // Score-paddle
+  var scorePaddleClass = {"init": "\"this.score=input.varClassScore;this.paddle=input.varClassPaddle;\"",
+                          "Update": "\"if (this.paddle.hit == 1) {this.score.score += 1;}" +
+                             "else if (this.paddle.hit == -1) {this.score.score = 0;} this.paddle.hit = 0;\"" };
+  var scorePaddle = new Assets({name: "ClassScorePaddle", data: scorePaddleClass});
+  scorePaddle.save();
+  // Arkanoid block
+  var blockClass = {"init": "\"this.x=input.x;this.y=input.y;this.w=input.w;this.h=input.h;\"",
+                     "Draw": "h.DrawRect(\"'#FF0000'\",\"this.x\",\"this.y\",\"this.w\",\"this.h\")"  };
+  // Interaction between Arkanoid blocks and the ball
+  var blockClass = {"init": "\"this.block=input.varClassArkanoidBlock;this.ball=input.varClassBall;\"",
+                     "Update": "\"if (this.ball.x > this.block.x && this.ball.x < this.block.x+this.block.w && " +
+					           "this.ball.y > this.block.y && this.ball.y < this.block.y+this.block.h) {" +
+							   "if (this.ball.x-this.ball.vx <= this.block.x || this.ball.x-this.ball.vx >= this.block.x+this.block.w)" +
+							   "{this.ball.vx *= -1;}" +
+							   "if (this.ball.y-this.ball.vy <= this.block.y || this.ball.y-this.ball.vy >= this.block.y+this.block.h)" +
+							   "{this.ball.vy *= -1;}" +
+							   "this.block.x = -9999;} \""};
+  // Horizontal paddle.  It functions very different from vertical (ordinary paddles).  Both are meant to be superseded by the property and composite systems
+  var paddleClass = {"init": "\"this.p = input.p;this.y = input.y;this.x=input.x;this.hit=0;\"",
+                     "Draw": "h.DrawRect(\"'#FF0000'\",\"this.p-50\",\"this.y-10\",\"100\",\"10\")",
+                     "Update": "\"if (keyMan.Query(37)) {this.p -= 5;} if (keyMan.Query(39)) {this.p += 5;}" + 
+					           "if (this.p<50) {this.p=50;} if (this.p > this.x-50) {this.p = this.x-50;}\""};
+  // Arkanoid game.
+  function ArkanoidFunction(request,response,dbManager,h) {
+    var ObjectList = [["ClassBG", ["{x:640, y:480}"]], ["ClassBorder",[
+            "{x:0,y:0,w:10,h:480,rx:-1,ry:1}",
+            "{x:0,y:0,w:640,h:10,rx:1,ry:-1}",
+            "{x:630,y:0,w:10,h:480,rx:-1,ry:1}"]],
+			["ClassArkanoidBlock", ["{x:30,y:30,w:80,h:15}","{x:140,y:30,w:80,h:15}","{x:250,y:30,w:80,h:15}","{x:360,y:30,w:80,h:15}",
+			                        "{x:30,y:130,w:80,h:15}","{x:140,y:130,w:80,h:15}","{x:250,y:130,w:80,h:15}","{x:360,y:130,w:80,h:15}",
+									"{x:30,y:230,w:80,h:15}","{x:140,y:230,w:80,h:15}","{x:250,y:230,w:80,h:15}","{x:360,y:230,w:80,h:15}"]],
+			["ClassHpaddle",["{p:300,y:480,x:640}"]], ["ClassBall",["{x:10, y:240, vx:5, vy:5}"]]];
+	h.BagOfObjects(ObjectList,request,response,dbManager,h);
+  }
+  MakeTemplate("Arkanoid",h.SimpleInputForm(["name"]),ArkanoidFunction);
+  
+  // Space Invaders stuff
+  // Space Invaders background.  Does general Space Invaders stuff (should be modified)
+  var bgClass = {"init": "\"this.x=input.x;this.y=input.y;\"+h.LoadImage('shipImg', '/img/ship.jpg')+h.LoadImage('alienImg', '/img/alien.jpg');", 
+                 "Draw": "h.DrawRect(\"\'#000000\'\",\"0\",\"0\",\"this.x\",\"this.y\");"};
+  MakeClass("ClassSpaceinvadersbg",bgClass);
+  // Ship
+  var shipClass = {"init": "\"this.x=input.x;this.y=input.y;\"", 
+                   "Draw": "h.DrawImage('shipImg',\"this.x\",\"this.y\");",
+				   "Update": "\"if (keyMan.Query(37)) {this.x -= 5;} if (keyMan.Query(39)) {this.x += 5;}\"",
+				   "KeyFunc": "\"if (input==13) {NewObj('ClassBullet',{x:this.x+16, y:this.y, vx:0, vy:-8});}\""};
+  MakeClass("ClassShip",shipClass);
+  // Alien
+  var alienClass = {"init": "\"this.x=input.x;this.y=input.y;\"", 
+                 "Draw": "h.DrawImage('alienImg',\"this.x\",\"this.y\");"};
+  MakeClass("ClassAlien",alienClass);
+  // Ship-background interaction,
+  var shipBgClass = {"init": "\"this.bg=input.varClassSpaceinvadersbg;this.ship=input.varClassShip;\"",
+                     "Update": "\"if (this.ship.x < 0) {this.ship.x = 0} if (this.ship.x>this.bg.x-32) {this.ship.x = this.bg.x-32}\""};
+  MakeClass("ClassShipBG",shipBgClass);
+  // Bullets
+  var bulletClass = {"init": "\"this.x=input.x;this.y=input.y;this.vx=input.vx;this.vy=input.vy;\"", 
+                     "Draw": "h.DrawRect(\"\'#FF4444\'\",\"this.x-5\",\"this.y-5\",\"10\",\"10\");",
+					 "Update": "\"this.x += this.vx;this.y += this.vy;\""};
+  MakeClass("ClassBullet",bulletClass);
+  // Bullet-background interactions
+  var bulletBgClass = {"init": "\"this.bg=input.varClassSpaceinvadersbg;this.bullet=input.varClassBullet;\"",
+                       "Update": "\"if (this.bullet.x < 0 || this.bullet.x > this.bg.x || this.bullet.y < 0 || this.bullet.y > this.bg.y)"+
+					             "{ObjDel(this.bullet.address);}\""};
+  MakeClass("ClassBulletBG",bulletBgClass);
+  // Bullet-alien interactions
+  var bulletAlienClass = {"init": "\"this.alien=input.varClassAlien;this.bullet=input.varClassBullet;\"",
+                          "Update": "\"if (this.bullet.x > this.alien.x && this.bullet.x < this.alien.x+32 &&"+
+						            "this.bullet.y > this.alien.y && this.bullet.y < this.alien.y+32)"+
+					                  "{var a = this.alien.address;var b = this.bullet.address; ObjDel(a); ObjDel(b);}\""};
+  MakeClass("ClassAlienBullet",bulletAlienClass);
