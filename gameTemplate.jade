@@ -1,0 +1,12 @@
+doctype html
+html
+  head
+    title Game
+  body
+    h1 Game
+    <canvas id="gameCanvas" width="400" height="300" style="border:1px solid #000000;"></canvas>
+    script(type='text/javascript').
+      var c=document.getElementById("gameCanvas");
+      var ctx=c.getContext("2d");
+      ctx.fillStyle="#FF0000";
+      ctx.fillRect(20,20,#{x},#{y});

@@ -1,0 +1,26 @@
+doctype html
+html
+  head
+    title !{name}
+  body
+    h1 !{name}
+    - var x = 400
+    - var y = 300
+    if game.x
+        - x = game.x
+    if game.y
+        - y = game.y
+    <canvas id="gameCanvas" width="#{x}" height="#{y}" style="border:1px solid #000000;position: fixed; left: 10; top: 200; z-index: 1;"></canvas>
+    script(type="text/javascript").
+      var canv = document.getElementById("gameCanvas");
+      var ctx = canv.getContext("2d");
+      var gameID = "#{gameID}";
+      var AUTOPLAY = #{mode} - 1;
+      var gameImages = {};
+    !{initCode}
+    br
+    br
+    h3
+    <div style='position:fixed; width:550px; left:10px; top:590px; padding-top:0px; z-index:2;'>
+    a(href="/") Home
+    </div>
