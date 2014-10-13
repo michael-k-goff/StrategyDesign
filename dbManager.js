@@ -39,7 +39,8 @@ function SetUp() {
       saveData: String,
       http_func: Function,
       x: Number,
-      y: Number
+      y: Number,
+	  instructions: String
     });
     var AssetSchema = new mongoose.Schema({
       name: String,
@@ -72,6 +73,15 @@ function SetUp() {
     exports.Templates = mongoose.model('Templates', TemplateSchema);
 	exports.Classes = mongoose.model('Classes', ClassSchema);
 	exports.quads = mongoose.model('quads',QuadSchema);
+	// Create two accounts if necessary
+    var new_user = new exports.Users({ username:"public", password: "public" });
+    new_user.save();
+    var new_user_data = new exports.UserData( {username: "public"} );
+    new_user_data.save();
+    var new_user = new exports.Users({ username:"admin", password: "adminpass" });
+    new_user.save();
+    var new_user_data = new exports.UserData( {username: "admin"} );
+    new_user_data.save();
   });
 }
 exports.SetUp = SetUp;

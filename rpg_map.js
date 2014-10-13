@@ -3,7 +3,7 @@
 // Assume the map is attached to the core state.  This may be changed later
 CoreState.StatesToSuppressMap = [];
 CoreDisplayPipeline.push(function() {
-  if (CoreState.StatesToSuppressMap.indexOf(this.state) < 0) {DrawMap();}
+	if (CoreState.StatesToSuppressMap.indexOf(CoreState.state) < 0) {DrawMap();}
 });
 
 CoreProcessPipeline.push(function(core_state) {
@@ -159,10 +159,10 @@ LoadGameDataOps.tilesets = function(temp) {
 function DrawHero() {
   var hx = 304+GameState.location.camera_x;
   var hy = 224+GameState.location.camera_y;
-  if (GameState.location.dy == 1) {DrawImage32({x:hx, y: hy, image: "herodown.jpg"});}
-  else if (GameState.location.dy == -1) {DrawImage32({x:hx, y: hy, image: "heroup.jpg"});}
-  else if (GameState.location.dx == 1) {DrawImage32({x:hx, y: hy, image: "heroright.jpg"});}
-  else {DrawImage32({x:hx, y: hy, image: "heroleft.jpg"});}
+  if (GameState.location.dy == 1) {DrawImage32({x:hx, y: hy, image: "superhero.gif"});} // Down
+  else if (GameState.location.dy == -1) {DrawImage32({x:hx, y: hy, image: "superhero.gif"});} // Up
+  else if (GameState.location.dx == 1) {DrawImage32({x:hx, y: hy, image: "superhero.gif"});} // Right
+  else {DrawImage32({x:hx, y: hy, image: "superhero.gif"});} // Left
 }
 
 // Draw the borders of the map

@@ -39,18 +39,19 @@ for (var i=0; i<Modules.length; i++) { // Fill in the dependencies in the module
 exports.Modules = Modules;
 
 function makeRPG(input) {
-  var varCode = fs.readFileSync("rpg_code.js") + fs.readFileSync("rpg_graphics.js") + fs.readFileSync("rpg_controller.js");
-  for (var i=0; i<Modules.length; i++) {
-    if (input[Modules[i].v]) {varCode += fs.readFileSync(Modules[i].file);}
-  }
-  function http_func(req_body, game, response, dbManager, templates) {
-	templates.http_func(req_body, game, response, dbManager, ["rpg2"]);
-  }
-  var gameCode = "<canvas id='glCanvas' width='640' height='480' style='border:1px solid #000000;position: fixed; left: 10; top: 200; z-index: 0;'></canvas>" +
+	var varCode = fs.readFileSync("rpg_code.js") + fs.readFileSync("rpg_graphics.js") + fs.readFileSync("rpg_controller.js");
+	for (var i=0; i<Modules.length; i++) {
+		if (input[Modules[i].v]) {varCode += fs.readFileSync(Modules[i].file);}
+	}
+	function http_func(req_body, game, response, dbManager, templates) {
+		templates.http_func(req_body, game, response, dbManager, ["rpg2"]);
+	}
+	var gameCode = "<canvas id='glCanvas' width='640' height='480' style='border:1px solid #000000;position: fixed; left: 10; top: 200; z-index: 0;'></canvas>" +
 	       "<script type='text/javascript' src='/loadscript/glMatrix-0.9.5.min.js'></script>" +
 	       h.MakeScript(varCode);
-	
-  return {name: input.name, gameCode: gameCode, http_func: http_func, x: 640, y: 480}; // Package code and game metadata
+	var inst = "Press arrow keys to walk and scroll through menus.<br><br>Press enter key to interact with people and select menu choices<br><br>" +
+	"Press right shift key to cancel menus.";
+	return {name: input.name, gameCode: gameCode, http_func: http_func, x: 640, y: 480, instructions:inst}; // Package code and game metadata
 }
 exports.makeRPG = makeRPG;
 
@@ -82,8 +83,8 @@ function makeGraph(store, input, gameid)
 	if (isNaN(input.size)) {input.size = 5;}
 	if (!input.size || input.size < 1 || input.size > 1000) {input.size = 5;}
 	
-	var imglist =["water.jpg","tree.jpg","heroup.jpg","herodown.jpg","heroright.jpg","heroleft.jpg","person.jpg","alien.jpg","alien.jpg","bunny.jpg","spider.jpg","ship.jpg","blob.jpg",
-	  "town.jpg","warp.jpg","treemonster.jpg","desert.jpg","grass.jpg","mountain.jpg","ice.jpg","tundra.jpg"];
+	var imglist =["water.png","tree.png","superhero.gif","scientist.gif","atoman.gif","giantWorm.gif","treemonster.gif","golem.gif","blob.png",
+	  "town.jpg","warp.jpg","desert.png","grass.png","mountain.png","ice.png","tundra.png"];
 	for (var img in imglist) {AddImage(bnode,graph,store,imglist[img]);}
 	EnemyList = MakeEnemies(bnode,graph,store,input);
 	MakeMaps(bnode, graph, store, input, gameid, EnemyList);
@@ -213,12 +214,12 @@ function MakeMaps(bnode, graph, store, input, gameid, EnemyList) {
 }
 
 function MakeTilesets(input) {
-  var overtile = {f:["tree.jpg",1], w:["water.jpg",0], g:["grass.jpg",1], d:["desert.jpg",1], i:["ice.jpg",1], m:["mountain.jpg",0],t:["tundra.jpg",1], border: "w"};
+  var overtile = {f:["tree.png",1], w:["water.png",0], g:["grass.png",1], d:["desert.png",1], i:["ice.png",1], m:["mountain.png",0],t:["tundra.png",1], border: "w"};
   return JSON.stringify({Overtile: overtile});
 }
 function MakeEnemies(bnode,graph,store,input) {
   var Enemies = {};
-  var enemy_bases = [["alien","Alien","alien.jpg"],["bunny","Bunny","bunny.jpg"],["spider","Spider","spider.jpg"],["blob","Blob","blob.jpg"]];
+  var enemy_bases = [["atoman","Atoman","atoman.gif"],["worm","Worm","giantWorm.gif"],["treemonster","Tree Monster","treemonster.gif"],["blob","Blob","blob.png"]];
   var powers = [];
   for (var i = 0; i < input.size; i++) {
     var power = [];
@@ -237,7 +238,7 @@ function MakeEnemies(bnode,graph,store,input) {
 	}
 	powers.push(power);
   }
-  Enemies["boss"] = {name: "Final Boss",id: "ship.jpg", HP: 3*input.size, Str: 0, EXP:0, Gold:0};
+  Enemies["boss"] = {name: "Final Boss",id: "golem.gif", HP: 3*input.size, Str: 0, EXP:0, Gold:0};
   for (enemy in Enemies) {AddTriple(bnode, graph,store,"HasEnemy",JSON.stringify([enemy,Enemies[enemy]]));}
   Enemies.power = powers;
   return Enemies;

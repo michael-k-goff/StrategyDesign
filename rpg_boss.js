@@ -17,7 +17,7 @@ MapObjectClasses.Boss = Boss;
 
 Boss.prototype.Display = function() {
   var img = this.img;
-  if (!img) {img = "ship.jpg";}
+  if (!img) {img = "golem.gif";}
   DrawImage32({x:304+32*this.x,y:224+32*this.y,image:img});
 }
 

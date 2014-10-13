@@ -82,31 +82,27 @@ function tempExPOST(request, response) { // Process template execution
 exports.tempExPOST = tempExPOST;
 
 function inputUpdatePOST(request,response) { // Update an input form
-  exports.dbManager.Templates.findById(request.body.template, function(err, template) {
-    templates.UpdateInputPage(request, response);
-  });
+	exports.dbManager.Templates.findById(request.body.template, function(err, template) {
+		templates.UpdateInputPage(request, response);
+	});
 }
 exports.inputUpdatePOST = inputUpdatePOST;
 
 function CustomUpdate(request,response) {
-  exports.dbManager.UserData.findOne({username:request.user.username}, function(err,user_data) {
-    templates.CustomUpdate(request.body,response,user_data);
-  });
+	user = "public";
+	if (request.user) {user = request.user.username}
+ 	exports.dbManager.UserData.findOne({username:user}, function(err,user_data) {
+		templates.CustomUpdate(request.body,response,user_data);
+	});
 }
 exports.CustomUpdate = CustomUpdate;
 
 function customPOST(request, response, UserData, Templates) {
-  var query = Templates.findById(request.body["templateID"]);
-  query.select('name i _id');
-  if (!request.user) {
-    response.send("Please log in.");
-  } else {
-    UserData.findOne({username: request.user.username}, function(err,user_data) {
-      query.exec(function(err, template) {
-	    exports.dbManager.GenerateCustomPage(request, response, template.i, template.id);
-      });
-    });
-  }
+	var query = Templates.findById(request.body["templateID"]);
+	query.select('name i _id');
+	query.exec(function(err, template) {
+		exports.dbManager.GenerateCustomPage(request, response, template.i, template.id);
+	});
 }
 exports.customPOST = customPOST;
 
@@ -135,47 +131,56 @@ function signupPOST(request, response, Users, UserData) {
 exports.signupPOST = signupPOST;
 
 function signupGET(request, response) {
-  var content = 'Register a new account:' + '<form action="/signup" method="post">' +
+	var content = "<link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css'>" +
+		'Register a new account:' + '<form action="/signup" method="post">' +
         '<div>' + '<label>Username:</label>' + '<input type="text" name="username"/><br/>' + '</div>' +
         '<div>' + '<label>Password:</label>' + '<input type="password" name="password"/>' + '</div>' +
         '<div>' + '<input type="submit" value="Submit"/>' + '</div>' +
         '</form>';
-  response.send(content);
+	response.send(content);
 }
 exports.signupGET = signupGET;
 
 function loginGET(request, response) {
-  var content = 'Log in:' + '<form action="/login" method="post">' +
-        '<div>' + '<label>Username:</label>' + '<input type="text" name="username"/><br/>' + '</div>' +
-        '<div>' + '<label>Password:</label>' + '<input type="password" name="password"/>' + '</div>' +
-        '<div>' + '<input type="submit" value="Submit"/>' + '</div>' +
-        '</form>';
-  response.send(content);
+	var content = "<link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css'>" +
+		'Log in:' + '<form action="/login" method="post">' +
+		'<div>' + '<label>Username:</label>' + '<input type="text" name="username"/><br/>' + '</div>' +
+		'<div>' + '<label>Password:</label>' + '<input type="password" name="password"/>' + '</div>' +
+		'<div>' + '<input type="submit" value="Submit"/>' + '</div>' +
+		'</form>';
+	response.send(content);
 }
 exports.loginGET = loginGET;
 
 function indexGET(request, response, UserData, Games, Templates) {
-  indexTemp = fs.readFileSync("indexTemplate.jade");
-  var fn = jade.compile(indexTemp);
-  var query = Templates.find();
-  query.select('name _id');
-  if (!request.user) {
-    query.exec(function(err, dbtemplates) {
-      var content = fn({"templates": dbtemplates, "user": request.user});
-      response.send(content.toString());
-    });
-  } else {
-    UserData.findOne({username: request.user.username}, function(err,user_data) {
+	indexTemp = fs.readFileSync("indexTemplate.jade");
+	var fn = jade.compile(indexTemp);
+	var query = Templates.find();
+	query.select('name _id');
+	var user = "public";
+	if (request.user) {user = request.user.username}
+	UserData.findOne({username: user}, function(err,user_data) {
 //    In case of a problem, comment out these two lines to clear the input cache for the given user	
 //	  user_data.inputCache = ""; // asdf
 //	  user_data.save(); // asdf
-      query.exec(function(err, dbtemplates) {
-        Games.find().where('_id').in(user_data.myGames).exec(function(err, games) {
-          var content = fn({"templates": dbtemplates, "user": request.user, "games": games});
-          response.send(content.toString());
-        });
-      });
-    });
-  }
+		query.exec(function(err, dbtemplates) {
+			Games.find().where('_id').in(user_data.myGames).exec(function(err, games) {
+				var content = fn({"templates": dbtemplates, "user": user, "games": games});
+				response.send(content.toString());
+			});
+		});
+	});
 }
 exports.indexGET = indexGET;
+
+function delgamePOST(request,response) {
+	var user = "public";
+	if (request.user) {user = request.user.username}
+	exports.dbManager.UserData.findOne({username: user}, function (err, user_data) {
+		user_data.myGames.splice(user_data.myGames.indexOf(request.body.gameID),1);
+		user_data.save();
+	});
+	exports.dbManager.Games.remove({_id:request.body.gameID});
+	response.redirect('/');
+}
+exports.delgamePOST = delgamePOST;

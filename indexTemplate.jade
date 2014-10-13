@@ -1,6 +1,7 @@
 doctype html
 html
   head
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
     script.
       function postwith (to,p) {
         console.log("posting");
@@ -20,36 +21,41 @@ html
     title StrategyDesign
   body
     h1 StrategyDesign
-    if user
-      p Welcome !{user.username}.
-    if phrase
-      p !{phrase}
+    if user && user != "public"
+      p Welcome !{user}.
     - each key in templates
-      <button type="button" class="btn btn-default"><a href="javascript:postwith('custom',{templateID:&quot;#{key._id}&quot;})">!{key["name"]}</a></button>
+      <button type="button" onclick="postwith('custom',{templateID:&quot;#{key._id}&quot;})" class="btn btn-lg btn-success">Create new !{key["name"]}</button>
     br
     if games
       - each game in games
-        <button type="button" class="btn btn-default"><a href="javascript:postwith('game',{loadGame: 1, gameID:&quot;#{game._id}&quot;})">!{game.name}</a></button>
-        <button type="button" class="btn btn-default"><a href="javascript:postwith('game',{loadGame: 2, gameID:&quot;#{game._id}&quot;})">!{game.name + " - Auto"}</a></button>
+        - var name = "Untitled"
+        if game.name
+          - name = game.name
+        br
+        <button type="button" onclick="postwith('game',{loadGame: 1, gameID:&quot;#{game._id}&quot;})" class="btn btn-lg btn-primary">!{name}</button>
+        <button type="button" onclick="postwith('game',{loadGame: 2, gameID:&quot;#{game._id}&quot;})" class="btn btn-lg btn-primary">!{name + " - Autoplay"}</button>
+        <button type="button" onclick="postwith('delgame',{gameID:&quot;#{game._id}&quot;})" class="btn btn-lg btn-danger">!{"Delete " + name}</button>
+    br
     br
     a(href="/login").
       Log in
     br
     a(href="/signup").
       Register
-    br
-    br
-    br
-    br
-    br
-    br
-    br
-    br
-    br
-    br
-    <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;restore&quot;})">Restore</a></button>
-    <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;report&quot;})">Report</a></button>
-    <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;setrdf&quot;})">Set RDF</a></button>
-    <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;rdfreport&quot;})">RDF Report</a></button>
-    <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;cleargames&quot;})">Clear Games</a></button>
-    <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;nuke&quot;})">Nuke RDF Database</a></button>
+    if user == 'admin'
+      br
+      br
+      br
+      br
+      br
+      br
+      br
+      br
+      br
+      br
+      <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;restore&quot;})">Restore</a></button>
+      <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;report&quot;})">Report</a></button>
+      <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;setrdf&quot;})">Set RDF</a></button>
+      <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;rdfreport&quot;})">RDF Report</a></button>
+      <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;cleargames&quot;})">Clear Games</a></button>
+      <button type="button" class="btn btn-default"><a href="javascript:postwith('admin',{command:&quot;nuke&quot;})">Nuke RDF Database</a></button>

@@ -17,18 +17,23 @@ exports.http_func = http_func;
 
 // Create the customization page from interpreted input.  This function is a wrapper that extracts user data
 function GenerateCustomPage(request, response, input, id) { // id is for the template
-  dbManager.UserData.findOne({username: request.user.username}, function(err,user_data) {
-    var inputCache = {clear:1};
-	if (user_data.inputCache) {inputCache = JSON.parse(user_data.inputCache);}
-	if (inputCache.clear) {
-	  inputCache = CreateInputCache(input);
-	  user_data.inputCache = JSON.stringify(inputCache);
-	  user_data.save(function(err) {
-	    GenerateCustomPageHelper(request,response,input,id,inputCache);
-      });
-	}
-    else {GenerateCustomPageHelper(request,response,input,id,inputCache);}
-  });
+	user = "public";
+	if (request.user) {user = request.user.username}
+	dbManager.UserData.findOne({username: user}, function(err,user_data) {
+		var inputCache = {clear:1};
+		if (user_data && user_data.inputCache) {inputCache = JSON.parse(user_data.inputCache);}
+		if (inputCache.clear) {
+			inputCache = CreateInputCache(input);
+			if (user_data) {
+				user_data.inputCache = JSON.stringify(inputCache);
+				user_data.save(function(err) {
+					GenerateCustomPageHelper(request,response,input,id,inputCache);
+				});
+			}
+			else {GenerateCustomPageHelper(request,response,input,id,inputCache);}	
+		}
+		else {GenerateCustomPageHelper(request,response,input,id,inputCache);}
+	});
 }
 
 function CreateInputCache(input,id) { // When activating a template, create the starting input cache
@@ -64,6 +69,7 @@ function GenerateStandardAngular() {
 // Create the customization page from interpreted input
 function GenerateCustomPageHelper(request, response, input, id, inputCache) { // id is for the template
   var code = "<!doctype html><html>";
+  code += "<link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css'>";
   code += "<head><script type='text/javascript' src='/loadscript/angular.min.js'></script></head>\n";
   code += GenerateStandardAngular(); // Creates standard angular code to be used by various modules
   code += "<body ng-app = 'customApp'>";
@@ -264,42 +270,44 @@ function ModuleParse(input,parse_position,id,inputCache) { // id is for the temp
 }
 
 function CreateNewGame(request, response, user_data) {
-  var inputCache = {};
-  if (user_data.inputCache) {inputCache = JSON.parse(user_data.inputCache);}
-  var game_data = rpg.makeRPG(inputCache);
-  // Export the game
-  var new_game = new dbManager.Games(game_data);
-  new_game.save(function(err) {
-    dbManager.Games.findById(new_game, function (err, game) {
-      user_data.myGames.push(game.id);
-      if (user_data.inputCache ) {user_data.inputCache = JSON.stringify({template: user_data.inputCache.template,clear:1})} // Mostly clear the cache upon creating the game
-	  else {user_data.inputCache = JSON.stringify({template: request.body.template,clear:1})}
-      user_data.save();
-	  var graph = rpg.makeGraph(dbManager.store, inputCache, game.id);
-	  dbManager.store.insert(graph, function(success) {response.redirect("/")});
-    });
-  });
+	var inputCache = {};
+	if (user_data.inputCache) {inputCache = JSON.parse(user_data.inputCache);}
+	var game_data = rpg.makeRPG(inputCache);
+	// Export the game
+	var new_game = new dbManager.Games(game_data);
+	new_game.save(function(err) {
+		dbManager.Games.findById(new_game, function (err, game) {
+			user_data.myGames.push(game.id);
+			if (user_data.inputCache ) {user_data.inputCache = JSON.stringify({template: user_data.inputCache.template,clear:1})} // Mostly clear the cache upon creating the game
+			else {user_data.inputCache = JSON.stringify({template: request.body.template,clear:1})}
+			user_data.save();
+			var graph = rpg.makeGraph(dbManager.store, inputCache, game.id);
+			dbManager.store.insert(graph, function(success) {response.redirect("/")});
+		});
+	});
 }
 
 // Update the input form and remain there
 function UpdateInputPage(request,response) {
-  dbManager.UserData.findOne({username: request.user.username}, function(err,user_data) {
-    if (request.body.create) { // Create a new game from data.  Should probably be spun off to a new function
-	  CreateNewGame(request,response,user_data);
-	  return;
-	}
+	var user = "public";
+	if (request.user) {user = request.user.username}
+	dbManager.UserData.findOne({username: user}, function(err,user_data) {
+		if (request.body.create) { // Create a new game from data.  Should probably be spun off to a new function
+			CreateNewGame(request,response,user_data);
+			return;
+		}
     var new_cache = {};
 	if (user_data.inputCache) {new_cache = JSON.parse(user_data.inputCache);}
 	if (!new_cache.template) {new_cache.template = request.body.template;}
 	// Eventually we will need more general instructions on how to update the cache from input.
 	variable_names = JSON.parse(request.body.variable_names);
 	for (var i = 0; i < variable_names.length; i++) {
-	  var vn = variable_names[i];
-	  new_cache[vn] = request.body[vn];
+		var vn = variable_names[i];
+		new_cache[vn] = request.body[vn];
 	}
     user_data.inputCache = JSON.stringify(new_cache);
 	user_data.save(function(err) {
-	  response.redirect(307,"/custom_u");
+		response.redirect(307,"/custom_u");
 	});
   });
 }

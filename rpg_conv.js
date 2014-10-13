@@ -15,7 +15,7 @@ CoreState.substates.Conv = ConvState;
 function Person(input) {this.x = input.x; this.y = input.y; this.text = input.text}
 Person.prototype.Display = function() {
   var img = this.img;
-  if (!img) {img = "person.jpg";}
+  if (!img) {img = "scientist.gif";}
   DrawImage32({x:304+32*this.x,y:224+32*this.y,image:img})
 }
 Person.prototype.Query = function() {

@@ -48,7 +48,7 @@ TownState.TopDisplay = function () {
 }
 
 Town.prototype.Display = function() {
-  DrawImage32({x:304+32*this.x,y:224+32*this.y,image:"person.jpg"});
+  DrawImage32({x:304+32*this.x,y:224+32*this.y,image:"scientist.gif"});
 }
 
 SeekCoreStateOps.push(function() {

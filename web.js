@@ -56,18 +56,19 @@ passport.deserializeUser(function(id, done) {
 dbManager.SetUp();
 
 passport.use(new LocalStrategy(
-  function(username, password, done) {
-    dbManager.Users.findOne({ username: username }, function(err, user) {
-      if (err) { return done(err); }
-      if (!user) {
-        return done(null, false, { message: 'Incorrect username.' });
-      }
-      if (!user.validPassword(password)) {
-        return done(null, false, { message: 'Incorrect password.' });
-      }
-      return done(null, user);
-    });
-  }
+	function(username, password, done) {
+		if (username == "public") {return done(null,false, {message: 'Cannot log in as public'})}
+		dbManager.Users.findOne({ username: username }, function(err, user) {
+			if (err) { return done(err); }
+				if (!user) {
+					return done(null, false, { message: 'Incorrect username.' });
+				}
+				if (!user.validPassword(password)) {
+					return done(null, false, { message: 'Incorrect password.' });
+				}
+				return done(null, user);
+			});
+		}
 ));
 
 app.get('/', function(request, response) {viewLogic.indexGET(request, response, dbManager.UserData, dbManager.Games, dbManager.Templates) });
@@ -85,6 +86,7 @@ app.get('/img/:name', function(request,response) { response.sendfile("images/" +
 app.post('/comm', function(request,response) { viewLogic.commPOST(request,response, dbManager.Games,dbManager.UserData) }); // For communication with the server during game play
 app.post('/admin', function(request,response) { viewLogic.adminPOST(request, response, dbManager)});
 app.post('/fileupload', function(request,response) { viewLogic.uploadPOST(request, response) });
+app.post('/delgame', function(request,response) {viewLogic.delgamePOST(request,response)}); // Delete a game
 app.get('/loadscript/:src', function(request,response) {response.send(fs.readFileSync(request.params.src));});
 
 var port = process.env.PORT || 8080;
